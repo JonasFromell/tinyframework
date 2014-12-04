@@ -1,0 +1,8 @@
+## Interface: 60000
+## Title: TinyBags
+## Notes: Barebones bag addon
+## Author: Jonas Fromell
+## Version: 0.0.1
+## SavedVariables: TinyBagsDB
+TinyBags.xml
+TinyBags.lua
