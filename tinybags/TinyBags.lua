@@ -4,32 +4,40 @@ TinyBags = LibStub("AceAddon-3.0"):NewAddon("TinyBags", "AceConsole-3.0", "AceHo
 -- Addon lifecycle
 function TinyBags:OnInitialize()
     self.db=LibStub("AceDB-3.0"):New("TinyBagsDB")
-
-    -- Initialize main frame
-    self.MainFrame = self:Spawn("TinyBagsContainerFrame", function (frame)
-        frame:RegisterEvent("BAG_UPDATE") -- Fires when the contents of the bag is updated
-
-        function frame:BAG_UPDATE(...)
-            TinyBags:Print("BAG_UPDATE fired with arguments: " .. ...)
-        end
-
-        -- Display functions
-        frame:SetScript("OnShow", function ()
-            self.isShown = true
-        end)
-
-        frame:SetScript("OnHide", function ()
-            self.isShown = false
-        end)
-
-        function frame:Toggle()
-            if self.isShown then
-                self:Hide()
-            else
-                self:Show()
-            end
-        end
-    end)
+	
+	-- Initialize main frame
+	local MainFrame = self.ContainerFrame.Extend({
+		isShown = false, -- Flag display state
+		
+		Toggle = function(self)
+			if not self.isShown then
+				self:Show()
+			else
+				self:Hide()
+			end
+		end,
+		
+		OnShow = function(self, eventName, ...)
+			TinyBags:Print("OnShow called")
+			self.isShown = true
+		end,
+		
+		OnHide = function(self, eventName, ...)
+			TinyBags:Print("OnHide called")
+			self.isShown = false
+		end
+	})
+	
+	self.MainFrame = MainFrame.Spawn("TinyBagsMainFrame")
+	
+	-- TODO: This would look nicer with custom textures
+	self.MainFrame:SetBackdrop({bgFile="Interface/Tooltips/UI-Tooltip-Background"})
+	self.MainFrame:SetBackdropColor(0, 0, 0, 0.5)
+	-- TODO: Is it okay to do this?
+	self.MainFrame:SetAllPoints(UIParent)
+	
+	-- Hidden by default
+	self.MainFrame:Hide()
 end
 
 function TinyBags:OnEnable()
@@ -96,21 +104,18 @@ function TinyBags:HandleCloseBags(eventName, ...)
 end
 
 -- Utility functions
-function TinyBags:Spawn(name, factory)
-    local frame = CreateFrame('Frame', name)
 
-    -- Handle any registered events
-    frame:SetScript('OnEvent', function(self, event, ...)
-        return self[event](self, event, ...)
-    end)
-
-    -- Run the `factory` method, passing the created `frame`
-    factory(frame)
-
-    -- Return the created frame
-    return frame
+local function GetContainerFamily(bag)
+	if bag == KEYRING_CONTAINER then
+		return 256
+	end
+	
+	local freeslots, family = GetContainerNumFreeSlots(bag)
+	
+	return family
 end
 
+-- Bag iterators
 local BAGS = {}
 
 -- Carried bags
@@ -119,15 +124,35 @@ for i = 1, NUM_BAG_SLOTS do
 end
 BAGS[BACKPACK_CONTAINER]=BACKPACK_CONTAINER
 
+function iterator(tab, cur)
+	cur = next(tab, cur)
+	
+	while cur do
+		if GetContainerFamily(cur) then
+			return cur
+		end
+		
+		cur = next(tab, cur)
+	end
+end
+
 function TinyBags:IterateBags()
-    return function(tab, current)
-        current = next(tab, current)
-        while current do
-            local free, family = GetContainerNumFreeSlots(current)
-            if family == 0 then
-                return current
-            end
-            current = next(tab, current)
-        end
-    end
+    return iterator, BAGS
+end
+
+function TinyBags:IterateSlots()
+	local bag, slot, currentbagsize = nil, 0, 0
+	
+	return function()
+		while slot >= currentbagsize do
+			bag = iterator(BAGS, bag)
+			TinyBags:Print(bag)
+			if not bag then return nil end
+			
+			currentbagsize = GetContainerNumSlots(bag) or 0
+		end
+		
+		slot = slot + 1
+		return bag, slot, GetContainerItemLink(bag, slot)
+	end
 end

@@ -6,3 +6,5 @@
 ## SavedVariables: TinyBagsDB
 TinyBags.xml
 TinyBags.lua
+
+TinyBags\ContainerFrame.lua
